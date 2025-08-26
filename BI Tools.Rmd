@@ -1,0 +1,347 @@
+---
+title: "BI Tools Analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Introduction
+
+The information in this analysis comes from the website of Gartner, a consulting and research firm, which provides a list of all BI tools.
+
+We will retrieve information on the top 30 out of 200+ business intelligence tools ranked by number of reviews, from most to least, into Excel, such as tool name, number of reviews and its average rating.
+
+More information in the following link: https://www.gartner.com/reviews/market/analytics-business-intelligence-platforms
+
+## 2. Gartner's Ranking
+
+### 2.1 Importing Gartner's top 30 by Number of Reviews from high to low
+
+Importing the Excel extraction and display the 30 first BI tools by highest number of reviews to smallest ones.
+
+```{r, message=FALSE}
+library(readxl)
+df <- read_excel("C:/Users/dinho2/Medtronic PLC/Team - Thesis - Thesis/Thesis/4. References/R - BI Tools/BI Tools.xlsx", sheet = "4. Top 30 - Gartner")
+knitr::kable(
+  df,
+  caption = "Gartner Top 30 BI Tools",
+  format = "pipe"
+)
+```
+
+### 2.2 Transforming and Cleaning Data
+
+Transforming and cleaning such as removing parentheses and trimming data.
+
+```{r}
+# Remove text in parentheses (and the parentheses themselves)
+df$Tool <- gsub("\\s*\\(.*?\\)", "", df$Tool)
+
+# Trim leading/trailing whitespace
+df$Tool <- trimws(df$Tool)
+```
+
+```{r}
+# Shortening names
+df$Tool <- gsub("Microsoft Power BI", "Power BI", df$Tool)
+df$Tool <- gsub("SAP BusinessObjects BI Suite", "SAP Analytics", df$Tool)
+#df$Tool <- gsub("Oracle Analytics", "Oracle", df$Tool)
+#df$Tool <- gsub("Amazon QuickSight", "Amazon", df$Tool)
+df$Tool <- gsub("Sisense Fusion Analytics", "Sisense Analytics", df$Tool)
+df$Tool <- gsub("IBM Cognos Analytics", "IBM Analytics", df$Tool)
+#df$Tool <- gsub("Diver Platform", "Diver", df$Tool)
+#df$Tool <- gsub("ThoughtSpot Analytics", "ThoughtSpot", df$Tool)
+#df$Tool <- gsub("Zoho Analytics", "Zoho", df$Tool)
+df$Tool <- gsub("Pyramid Decision Intelligence Platform", "Pyramid", df$Tool)
+df$Tool <- gsub("Databricks Data Intelligence Platform", "Databricks", df$Tool)
+#df$Tool <- gsub("Alibaba Quick BI", "Alibaba", df$Tool)
+df$Tool <- gsub("Alteryx One Platform", "Alteryx", df$Tool)
+```
+
+### 2.3 Representation of Gartner's Ranking
+
+Visualizing the data as an exploratory data analysis.
+
+```{r, message=FALSE}
+library(wordcloud)
+library(RColorBrewer)
+set.seed(1234)
+wordcloud(
+  words = df$Tool,
+  freq = df[["Number of Reviews"]],
+  min.freq = 1,
+  max.words = 100,
+  random.order = FALSE,
+  rot.per = 0.1,
+  colors = brewer.pal(8, "Dark2"),
+  scale = c(4, 0.7)
+)
+```
+
+In this wordcloud visualization, we notice two principal business intelligence tools: Tableau and Power BI.
+
+```{r}
+library(ggplot2)
+# Reorder tools by descending Number of Reviews
+df$Tool <- factor(df$Tool, levels = df$Tool[order(-df[["Number of Reviews"]])])
+
+# Create vertical bar chart
+ggplot(df, aes(x = Tool, y = `Number of Reviews`, fill = Tool)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "BI Tools by Number of Ratings",
+    x = "Tool",
+    y = "Number of Reviews"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+```
+
+In this bar chart, we visualize quantitatively that Tableau and Power BI are far from the other business intelligence tools with more than 600 number of reviews.
+
+Now a scatterplot of the top 30 tools
+
+```{r}
+library(ggplot2)
+
+ggplot(df, aes(x = `Average Rating`, y = `Number of Reviews`, label = Tool)) +
+  geom_point(color = "steelblue", size = 3, alpha = 0.7) +
+  geom_text(vjust = -0.7, size = 3) +
+  labs(
+    title = "BI Tools: Average Rating vs. Number of Reviews",
+    x = "Average Rating",
+    y = "Number of Reviews"
+  ) +
+  theme_minimal()
+```
+
+
+## 3. New Ranking
+
+As the Gartner's ranking from largest to smallest has a bias of popularity, it has been decided to create a score system to better rank these business intelligence tools.
+
+### 3.1 Scoring System
+
+Creating multiple scoring systems to better visualize how the final ranking would be, mainly using squared, root square, and natural logarithm.
+
+```{r}
+# Core scoring formulas
+df$"Scoring1" <- round(df$`Average Rating` * df[["Number of Reviews"]], 0)             # Average Rating × Number of Reviews
+df$"Scoring2" <- round(df$`Average Rating` * sqrt(df[["Number of Reviews"]]), 0)       # Average Rating × √(Number of Reviews)
+df$"Scoring3" <- round(df$`Average Rating` * log(df[["Number of Reviews"]]), 1)        # Average Rating × ln(Number of Reviews)
+df$"Scoring4" <- round(df$`Average Rating`^2 * df[["Number of Reviews"]], 0)           # Average Rating² × Number of Reviews
+df$"Scoring5" <- round(df$`Average Rating`^2 * sqrt(df[["Number of Reviews"]]), 0)     # Average Rating² × √(Number of Reviews)
+df$"Scoring6" <- round(df$`Average Rating`^2 * log(df[["Number of Reviews"]]), 0)      # Average Rating² × ln(Number of Reviews)
+
+knitr::kable(
+  df,
+  caption = "BI Tools Scoring Table",
+  col.names = c(
+    "Gartner's Ranking", "Tool", "Number of Reviews", "Average Rating",
+    "Scoring1", "Scoring2", "Scoring3",
+    "Scoring4", "Scoring5", "Scoring6"
+  )
+)
+```
+
+At first glance, it is not easy to compare scoring systems with each other, but we note that some systems have a wide dispersion of scores.
+
+### 3.2 Ranking System
+
+We will transform each scoring system into a business intelligence tool ranking. Each system will have its own ranking.
+
+```{r, message=FALSE}
+library(dplyr)
+# Rank: Review × Ratings
+df <- df %>%
+  arrange(desc(`Scoring1`), desc(`Number of Reviews`)) %>%
+  mutate(`Rank: Scoring1` = row_number())
+
+# Rank: Review × √Ratings
+df <- df %>%
+  arrange(desc(`Scoring2`), desc(`Number of Reviews`)) %>%
+  mutate(`Rank: Scoring2` = row_number())
+
+# Rank: Review × log(Ratings)
+df <- df %>%
+  arrange(desc(`Scoring3`), desc(`Number of Reviews`)) %>%
+  mutate(`Rank: Scoring3` = row_number())
+
+# Rank: Review² × Ratings
+df <- df %>%
+  arrange(desc(`Scoring4`), desc(`Number of Reviews`)) %>%
+  mutate(`Rank: Scoring4` = row_number())
+
+# Rank: Review² × √Ratings
+df <- df %>%
+  arrange(desc(`Scoring5`), desc(`Number of Reviews`)) %>%
+  mutate(`Rank: Scoring5` = row_number())
+
+# Rank: Review² × log(Ratings)
+df <- df %>%
+  arrange(desc(`Scoring6`), desc(`Number of Reviews`)) %>%
+  mutate(`Rank: Scoring6` = row_number())
+```
+
+#### 3.2.1 Averaging the Scores, Sorting and Indexing
+
+Based on each ranking for each business intelligence tool, an average is calculated from this ranking.
+
+This average will give the average ranking for each of these systems.
+
+Then, this average will be sorted from highest to lowest.
+
+Finally, indexing will be performed based on the sorted average, which will create a temporary ranking.
+
+```{r}
+# Calculate average and standard deviation of ranks
+rank_columns <- grep("^Rank:", names(df), value = TRUE)
+df$`Rank Average` <- round(rowMeans(df[rank_columns]), 1)
+df$`Rank Std Dev` <- round(apply(df[rank_columns], 1, sd), 1)
+```
+
+```{r}
+# Sorting the final ranking by lowest Rank Average
+df <- df[order(df$`Rank Average`, df$`Rank Std Dev`), ]
+```
+
+```{r}
+# Indexing the final ranking using the Rank Average resulting from each scoring system
+df$`Temporary Ranking` <- seq_len(nrow(df))
+knitr::kable(
+  df[, c("Tool", "Average Rating", "Number of Reviews", "Rank Average", "Rank Std Dev", "Temporary Ranking")],
+  caption = "Summary of BI Tool Scores and Temporary Ranking",
+  col.names = c("Tool", "Average Rating", "Number of Reviews", "Rank Average", "Rank Std Dev", "Temporary Ranking")
+)
+```
+
+### 3.3 Testing the scoring and ranking systems.
+
+To find the best scoring system, a heatmap will be made in order to better visualize all the scoring systems.
+
+```{r}
+library(reshape2)
+library(ggplot2)
+
+# Step 1: Extract only ranking columns and Tool
+rank_columns <- grep("^Rank:", names(df), value = TRUE)
+ranking_matrix <- df[, c("Tool", rank_columns)]
+
+# Step 2: Melt into long format
+ranking_long <- melt(ranking_matrix, id.vars = "Tool", variable.name = "Scoring Method", value.name = "Rank")
+
+# Step 3: Merge with Rank Average to reorder Tool correctly
+ranking_long <- merge(ranking_long, df[, c("Tool", "Rank Average")], by = "Tool")
+
+# Step 4: Heatmap
+ggplot(ranking_long, aes(x = `Scoring Method`, y = reorder(Tool, `Rank Average`))) +
+  geom_tile(aes(fill = Rank)) +
+  scale_fill_gradient(low = "black", high = "white", name = "Rank") +
+  labs(
+    title = "Heatmap of BI Tool Rankings Across Scoring Methods",
+    x = "Scoring Method",
+    y = "BI Tool"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 6)
+  )
+
+```
+
+Based on this heat map, we can see that the scoring3 ranking closely follows and is very similar to the overall average ranking.
+
+#### 3.3.1 Finding the best scoring system
+
+Counting the matches of each scoring system to the temporary ranking.
+
+```{r, message=FALSE}
+# Step 1: Compare each score ranking to the final New Ranking
+rank_columns <- grep("^Rank:", names(df), value = TRUE)
+
+# Step 2: Count how many times each scoring method matches New Ranking
+match_counts <- sapply(rank_columns, function(col) {
+  sum(df[[col]] == df$`Temporary Ranking`, na.rm = TRUE)
+})
+
+# Step 3: Convert to data frame
+match_df <- data.frame(
+  ScoringMethod = rank_columns,
+  MatchesFinalRank = as.numeric(match_counts)
+)
+
+# Step 4: Sort descending by match count
+match_df <- match_df[order(-match_df$MatchesFinalRank), ]
+
+# Step 5: View results
+knitr::kable(
+  match_df,
+  caption = "Counting Match Between Scoring Methods and Final Ranking",
+  col.names = c("Scoring Method", "Exact Matches with Final Rank")
+)
+```
+
+The scoring system 3: "Review x log(Ratings)" is the most relevant one and will be chosen to make the final ranking.
+
+This scoring system shows that using a logarithm for the number of reviews is the right solution for balancing reviews against the number of ratings. It takes into account quantitative and qualitative review data and the popularity of the number of reviews. Using a logarithm compresses this range and rewards popularity without overdoing it.
+
+## 4. New Table with the Final Ranking
+
+In making this final ranking, we omit scoring systems that miscalculate the qualitative data of reviews and the popularity of the number of reviews, and only take into account the scoring system that allows for a more accurate final ranking.
+
+```{r}
+df <- df[, c("Rank: Scoring3", "Gartner's Ranking", "Tool", "Average Rating", "Number of Reviews", "Scoring3")]
+
+df %>%
+  arrange(`Rank: Scoring3`) %>%
+  knitr::kable(
+    caption = "New BI Tools Ranking",
+    col.names = c("Final Ranking", "Gartner's Ranking", "Tool", "Average Rating", "Number of Reviews", "Score")
+  )
+
+```
+
+This new ranking takes into account not only the quality of a business intelligence tool, but also its popularity.
+
+For example:
+
+- Tableau will always score higher than Power BI because they have the same rating, but also because it has more reviews
+- Spotfire scores higher and ranks better than Oracle Analytics because it has a better rating, even though it has slightly fewer reviews. This difference in numbers will not make a big difference to Spotfire's final rating, unless Spotfire is in turmoil or they release a bad update to the tool.
+- Oracle Analytics, Looker, and Amazon QuickSight have very similar scores. The difference lies in their popularity and ratings. But it's a very close call.
+
+## 5. Plotting the Final Ranking
+
+Plotting again the final ranking taking into account the reviews and the logarithm of popularity this time.
+
+```{r, message=FALSE}
+library(ggplot2)
+
+df$Tool <- factor(df$Tool, levels = df$Tool[order(df$`Rank: Scoring3`)])
+
+ggplot(df, aes(x = Tool, y = `Scoring3`, fill = Tool)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "New BI Tools Ranking",
+    x = "BI Tool",
+    y = "Score"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## 6. Exporting to Excel
+
+```{r}
+library(writexl)
+write_xlsx(df, "BI_Tools_Scoring_Comparison.xlsx")
+```
+
+
+
+
