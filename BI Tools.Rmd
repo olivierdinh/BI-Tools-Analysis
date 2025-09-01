@@ -1,8 +1,10 @@
 ---
 title: "BI Tools Analysis"
 output:
+  word_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -25,7 +27,7 @@ Importing the Excel extraction and display the 30 first BI tools by highest numb
 
 ```{r, message=FALSE}
 library(readxl)
-df <- read_excel("C:/Users/dinho2/Medtronic PLC/Team - Thesis - Thesis/Thesis/4. References/R - BI Tools/BI Tools.xlsx", sheet = "4. Top 30 - Gartner")
+df <- read_excel("C:/Users/olivi/OneDrive/Bureau/Github/BI-Tools-Analysis/BI Tools.xlsx", sheet = "4. Top 30 - Gartner")
 knitr::kable(
   df,
   caption = "Gartner Top 30 BI Tools",
